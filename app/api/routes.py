@@ -9,10 +9,14 @@ from services.models import ChatInput, ChatResponse, CompanyInfo, CompanyInput, 
 from utils.database import get_collection
 from utils.embedding_utils import get_company_embedding, get_support_program_embedding
 from utils.vector_store import VectorStore
+from services.taxation import TaxationService
+from pydantic import BaseModel
+import json
 
 router = APIRouter()
 chatbot = Chatbot()
 vector_store = VectorStore()
+taxation_service = TaxationService()
 
 
 @router.post("/insert_company")
@@ -142,3 +146,36 @@ async def business_viability_assessment_search(input: SupportProgramInfoSearchRe
                 search_results.append({"content": json.loads(hit.entity.get("content")), "metadata": {}})
 
     return search_results
+
+
+    
+class FileDTO(BaseModel):
+    fileName: str
+    content: str
+
+class TaxationDTO(BaseModel):
+    transactionList: FileDTO
+    incomeTaxProof: FileDTO
+    businessId: str
+    businessCode: str
+    currentDate: str
+    bank: str
+    businessType: str
+    businessContent: str
+    vatInfo: str
+    incomeRates: str   
+
+@router.post("/taxation")
+async def taxation(taxation_data: TaxationDTO):
+    """
+        Java에서 세무 데이터를 받아오는 엔드포인트
+    """
+    try: 
+        # 세무 처리
+        result = taxation_service.getTaxation(taxation_data)
+
+        # 결과를 Java로 응답
+        return {"message": "세무처리 전체 완료", "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
