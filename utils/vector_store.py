@@ -231,22 +231,6 @@ class VectorStore:
         else :
             self._check_and_create_index()
     
-    
-    def add_texts_with_metadata(self, texts: List[str], metadatas: List[Dict]):
-        """
-        텍스트와 메타데이터를 함께 벡터 저장소에 추가
-        :param texts: 추가할 텍스트 리스트
-        :param metadatas: 텍스트에 해당하는 메타데이터 리스트
-        """
-
-        collection = get_collection(self.collection_name)
-        embeddings = [self.embedding_function(text) for text in texts]
-
-        entities = [texts, metadatas,embeddings]
-        collection.insert(entities)
-        collection.flush()
-        logger.info(f"컬렉션에 metadata와 함꼐 {len(texts)}개의 텍스트를 저장했습니다.")
-
     def add_data_to_partitions(self, texts: Dict, partition_name: str):
         """
         특정 파티션에 데이터를 추가
@@ -256,8 +240,6 @@ class VectorStore:
         logger.info(f"add_data_to_partitions 진입 시 partition_name: {partition_name}")
         collection = get_collection(self.collection_name)
 
-        # texts 리스트의 구조를 로깅하여 확인
-        # logger.debug(f"Texts provided: {texts}")
 
         # texts 리스트에서 필요한 텍스트 필드 추출
         text_json = json.dumps(texts, ensure_ascii=False)  # 딕셔너리 전체를 JSON 문자열로 변환하여 저장
@@ -276,15 +258,100 @@ class VectorStore:
         logger.info(f"{len(texts)}개의 텍스트를 {partition_name} 파티션에 추가하였습니다.")
 
 
-    def search_in_partition(self, query: str, partition_name: str, k: int = 5)-> List[Dict[str, str]]:
+    def search_in_partition(self, query: str, partition_name: str, k: int = 50, business_id: int = None)-> List[Dict[str, str]]:
         """
         특정 파티션에서 유사도 검색 수행
         :param query : 검색 쿼리
         :param partition_name: 검색할 파티션 이름
         :param k : 반환할 결과 수
+        :param businessId : 조회할 businessId
         :return : 유사한 문서 리스트
         """
 
+        collection = get_collection(self.collection_name)
+        search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
+
+        # if(business_id):
+        #     expr = f'content like "%\\"businessId\\": {business_id}%"'
+
+        #     filtered_results = collection.query(
+        #         expr=expr, 
+        #         partition_names=[partition_name], 
+        #         output_fields=["content", "embedding"]
+        #     )
+       
+        #     if not filtered_results:
+        #         logger.info(f"{partition_name} 파티션에서 businessId {business_id}에 해당하는 데이터를 찾을 수 없습니다.")
+        #         return []
+            
+        #     # 필터링된 데이터를 바탕으로 유사도 검색 수행
+        #     search_results = []
+
+        #     for item in filtered_results:
+        #         embedding = self.embedding_function(item["content"])
+        #         result = collection.search(
+        #             data=[embedding],
+        #             anns_field="embedding",
+        #             param=search_params,
+        #             limit=k,
+        #             partition_names=[partition_name],
+        #             output_fields=["content"]
+        #         )
+        #         search_results.extend(result)
+
+        # else :
+             # 기본 검색
+        search_results = collection.search(
+                data=[self.embedding_function(query)],
+                anns_field="embedding",
+                param=search_params,
+                limit=k,
+                partition_names=[partition_name],
+                output_fields=["content"]
+        )
+
+        
+        if not search_results or len(search_results [0]) == 0 :
+                logger.info(f"{partition_name}의 이름의 파티션의 데이터를 찾을 수 없습니다.")
+                return []
+        
+        # 서버 측에서 businessId로 필터링
+        filtered_hits = []
+        for hit in search_results[0]:
+            content = hit.entity.get("content")
+            if content and (business_id is None or f'"businessId": {business_id}' in content):
+                filtered_hits.append({
+                    "content": content,
+                    "similarity": 1 - (hit.distance / max(search_results[0][0].distance, 1))
+                })
+
+
+        # hits = [
+        #     {
+        #         "content": hit.entity.get("content"),
+        #         "similarity": 1 - (hit.distance / max(search_results[0][0].distance, 1))
+        #     }
+        #     for hit in search_results[0]
+        #     if hit.entity.get("content")
+        # ]
+
+        # if not hits : 
+        #     logger.info(f"{partition_name} 파티션에서 검색 결과를 찾을 수 없습니다.")
+        
+        # return hits
+        if not filtered_hits:
+            logger.info(f"{partition_name} 파티션에서 검색 결과를 찾을 수 없습니다.")
+    
+        return filtered_hits
+    
+    def search_with_similarity_without_url(self, query: str, k: int = 20, threshold: float = 0.4) -> List[Dict[str, str]]:
+        """
+        유사도 임계값을 적용한 검색 수행 (url 필드 없이)
+        :param query: 검색 쿼리
+        :param k: 반환할 최대 결과 수
+        :param threshold: 유사도 임계값
+        :return: 임계값을 넘는 유사한 문서 리스트
+        """
         collection = get_collection(self.collection_name)
         search_params = {"metric_type": "L2", "params": {"nprobe": 10}}
 
@@ -293,20 +360,42 @@ class VectorStore:
             anns_field="embedding",
             param=search_params,
             limit=k,
-            partition_names=[partition_name],
-            output_fields=["content"]
+            output_fields=["content"],  # url 필드를 제외
         )
 
-        if not results or len(results[0]) == 0 :
-            logger.info(f"{partition_name}의 이름의 파티션을 찾을 수 없습니다.")
+        if not results or len(results[0]) == 0:
+            logger.info("No results found in vector store.")
             return []
 
-        hits = [{"content": hit.entity.get("content")} for hit in results[0] if hit.entity.get("content")]
+        hits = []
+        for hit in results[0]:
+            distance = hit.distance
+            similarity = 1 - (distance / max(results[0][0].distance, 1))
+            if similarity >= threshold:
+                hits.append({
+                    "content": hit.entity.get("content"),
+                    "metadata": {"similarity": similarity}
+                })
 
-        if not hits : 
-            logger.info(f"{partition_name} 파티션에서 검색 결과를 찾을 수 없습니다.")
-        
+        if not hits:
+            logger.info(f"No results met the similarity threshold of {threshold}.")
+
         return hits
+    
+    def get_data_by_business_id(self, business_id: int) -> Dict[str, List[Dict[str, str]]]:
+        """
+        특정 business_id에 해당하는 데이터를 모든 파티션에서 검색
+        :param business_id: 조회할 business_id
+        :return: 각 파티션에서 찾은 데이터의 딕셔너리
+        """
+        partition_names = ["BusinessInfo", "Question", "TransactionFile", "IncomeTaxFile"]
+        results = {}
+
+        for partition_name in partition_names:
+            result = self.search_in_partition(query="", partition_name=partition_name, business_id=business_id)
+            results[partition_name] = result
+
+        return results
     
     def search_in_all_partitions(self, query: str, k: int = 5) -> List[Dict[str, str]]:
         """

@@ -173,9 +173,9 @@ connect_to_milvus()
 
 # 샘플 데이터 조회
 # 한 컬렉션의 전체 데이터 조회
-# get_sample_data(settings.COLLECTION_NAME2, limit=5)
+get_sample_data(settings.COLLECTION_NAME2, limit=5)
 # 한 파티션의 데이터 조회
-get_data_from_partition(settings.COLLECTION_NAME2, "SimpleTransaction", 50 )
+# get_data_from_partition(settings.COLLECTION_NAME2, "SimpleTransaction", 50 )
 
 # 모든 컬렉션 삭제
 # drop_all_collection()

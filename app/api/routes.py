@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
-from services.chatbot import Chatbot
+from services.chatbot import Chatbot, TaxationChatbot
 from services.models import (
     ChatInput, 
     ChatResponse, 
@@ -22,12 +22,13 @@ from services.models import (
 from utils.database import get_collection
 from utils.embedding_utils import get_company_embedding, get_support_program_embedding
 from utils.vector_store import VectorStore
-from services.taxation import TaxationService
+from utils.taxation import TaxationService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 chatbot = Chatbot()
+taxationChatbot = TaxationChatbot()
 vector_store = VectorStore()
 taxation_service = TaxationService()
 
@@ -200,16 +201,16 @@ async def save_taxation(
 @router.post("/taxation/chat", response_model=dict)
 async def chat_with_bot(
     businessId: int = Form(...),
-    user_message: str = Form(...)
+    user_input: str = Form(...)
 ):
     
     """
     저장된 데이터를 기반으로 세무 챗봇과 대화하는 엔드포인트
     """
     try:
-        chatbot_response = chatbot.get_taxationChat_response(
+        chatbot_response = taxationChatbot.get_taxation_response(
             business_id=businessId,
-            user_message=user_message
+            user_input=user_input
         )
 
         return {"message": chatbot_response}
