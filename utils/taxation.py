@@ -11,6 +11,7 @@ import json
 from typing import List
 import logging
 from io import BytesIO
+import asyncio
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +21,7 @@ class TaxationService:
     def __init__(self):
         self.vector_store = VectorStore()
         self.vector_store.use_custom_collection(settings.COLLECTION_NAME2)
-        self.max_chunk_size = 65000  # 청크의 최대 크기 (바이트 기준)
+        self.max_chunk_size = 8000  # 청크의 최대 크기 (바이트 기준)
 
     def extract_text_from_pdf(self, pdf_data: bytes) -> str:
         """PDF 파일에서 텍스트를 추출"""
@@ -172,3 +173,29 @@ class TaxationService:
         self.store_income_tax_file(income_tax_proof_file, income_tax_proof_filename, business_id, "IncomeTaxFile")
         self.store_questions(answers, business_id, "Question")
         self.store_business_info(business_id, business_content, business_type, "BusinessInfo")
+
+
+async def test_file():
+    taxation = TaxationService()
+    test_pdf_path = "utils/files/이진아(950515)-2023년도자료.pdf"
+    # PDF 파일 읽기
+    with open(test_pdf_path, "rb") as f:
+        pdf_data = f.read()
+
+    # 테스트 파라미터 설정
+    business_id = 12345  # 테스트용 business_id
+    filename = "이진아(950515)-2023년도자료.pdf"
+    partition_name = "IncomeTaxFile"
+
+    # store_income_tax_file 메서드 호출
+    taxation.store_income_tax_file(
+            income_tax_proof_file=pdf_data,
+            income_tax_proof_filename=filename,
+            business_id=business_id,
+            partition_name=partition_name
+        )
+
+    print("Income tax file stored successfully")
+
+if __name__ == "__main__":
+    asyncio.run(test_file())
