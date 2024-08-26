@@ -8,16 +8,7 @@ from pydantic import BaseModel
 
 from services.chatbot import Chatbot
 from services.taxationChatBot import TaxationChatbot
-from services.models import (
-    ChatInput, 
-    ChatResponse, 
-    CompanyInfo, 
-    CompanyInput, 
-    CompanySearchResult, 
-    SupportProgramInfoSearchRequest,
-    TaxationBase,
-    WebSearchResult
-)
+from services.models import ChatInput, ChatResponse, CompanyInfo, CompanyInput, CompanySearchResult, SupportProgramInfoSearchRequest, WebSearchResult, TaxationBase
 from utils.database import get_collection
 from utils.embedding_utils import get_company_embedding, get_support_program_embedding
 from utils.vector_store import VectorStore
@@ -52,6 +43,7 @@ async def insert_company(input: CompanyInput):
     except Exception as e:
         logger.error(f"회사 정보 삽입 실패: {str(e)}")
         raise HTTPException(status_code=500, detail=f"회사 정보 삽입 실패: {str(e)}")
+
 
 @router.post("/search_similar_companies", response_model=List[CompanySearchResult])
 async def search_similar_companies(input: CompanyInfo):
@@ -88,22 +80,23 @@ async def search_similar_companies(input: CompanyInfo):
         logger.error(f"유사 회사 검색 중 오류 발생: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatInput):
     try:
         response = await chatbot.get_response(request.message)
-        
+
         logger.info(f"Raw chatbot response: {response}")
-        
+
         # WebSearchResult 객체 리스트로 변환
         web_results = []
         for result in response.get("relevant_info", []):
             try:
                 web_result = WebSearchResult(
-                    title=result.get('title') or "제목 없음",
-                    snippet=result.get('snippet') or "",
-                    url=result.get('url') or "https://example.com",
-                    image_url=result.get('image_url') or None
+                    title=result.get("title") or "제목 없음",
+                    snippet=result.get("snippet") or "",
+                    url=result.get("url") or "https://example.com",
+                    image_url=result.get("image_url") or None,
                 )
                 web_results.append(web_result)
             except ValueError as ve:
@@ -119,7 +112,7 @@ async def chat(request: ChatInput):
             text_response=response.get("text_response", "응답을 생성하는 데 문제가 발생했습니다."),
             web_results=web_results,
             graph_data=graph_data,
-            image_url=response.get("image_url")
+            image_url=response.get("image_url"),
         )
 
         logger.info(f"챗봇 응답이 성공적으로 생성되었습니다. 응답: {chat_response}")
@@ -127,12 +120,7 @@ async def chat(request: ChatInput):
 
     except Exception as e:
         logger.error(f"챗봇 응답 생성 중 오류 발생: {str(e)}", exc_info=True)
-        return ChatResponse(
-            text_response="내부 서버 오류가 발생했습니다. 나중에 다시 시도해 주세요.",
-            web_results=[],
-            graph_data=None,
-            image_url=None
-        )
+        return ChatResponse(text_response="내부 서버 오류가 발생했습니다. 나중에 다시 시도해 주세요.", web_results=[], graph_data=None, image_url=None)
 
 
 @router.post("/viability_search", response_model=List[dict])
@@ -157,7 +145,7 @@ async def business_viability_assessment_search(input: SupportProgramInfoSearchRe
             for hit in hits:
                 try:
                     content_str = hit.entity.get("content")
-                    
+
                     # JSON 파싱 시도
                     try:
                         content = json.loads(content_str)
@@ -166,22 +154,16 @@ async def business_viability_assessment_search(input: SupportProgramInfoSearchRe
                         content = {"businessName": "Unknown", "info": {"description": content_str}}
 
                     # 'businessName'과 'info'가 없는 경우 처리
-                    if 'businessName' not in content:
-                        content['businessName'] = 'Unknown'
-                    if 'info' not in content:
-                        content['info'] = {'description': str(content)}
+                    if "businessName" not in content:
+                        content["businessName"] = "Unknown"
+                    if "info" not in content:
+                        content["info"] = {"description": str(content)}
 
                     # 유사도 계산: 0에 가까울수록 유사, 1에 가까울수록 상이
                     similarity = 1 - (hit.distance / (max(hit.distance, 1) * 2))
                     logger.info(f"Calculated similarity: {similarity}")
                     if similarity >= input.threshold:
-                        search_results.append({
-                            "content": {
-                                "businessName": content.get("businessName"),
-                                "info": content.get("info")
-                            },
-                            "metadata": {}
-                        })
+                        search_results.append({"content": {"businessName": content.get("businessName"), "info": content.get("info")}, "metadata": {}})
                 except Exception as e:
                     logger.error(f"처리 중 오류 발생: {str(e)}, 원본 데이터: {hit.entity}")
 
@@ -192,7 +174,7 @@ async def business_viability_assessment_search(input: SupportProgramInfoSearchRe
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
+## 세무 
 @router.post("/taxation", response_model=dict)
 async def save_taxation(
     transaction_files: List[UploadFile] = File(...),
@@ -231,6 +213,7 @@ async def save_taxation(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"세금 관련 데이터 처리 중 오류 발생 : {str(e)}")
 
+## 세무
 @router.post("/taxation/chat", response_model=dict)
 async def chat_with_bot(
     businessId: int = Form(...),

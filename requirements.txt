@@ -45,3 +45,4 @@ bs4
 python-multipart
 openpyxl
 
+pdfplumber
