@@ -3,7 +3,7 @@ import logging
 from typing import List
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body
 from pydantic import BaseModel
 
 from services.chatbot import Chatbot
@@ -13,7 +13,8 @@ from utils.database import get_collection
 from utils.embedding_utils import get_company_embedding, get_support_program_embedding
 from utils.vector_store import VectorStore
 from utils.taxation import TaxationService
-
+from utils.fileSave import TaxFileSave
+from utils.save_tax_info import SaveTaxInfo
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ chatbot = Chatbot()
 taxationChatbot = TaxationChatbot()
 vector_store = VectorStore()
 taxation_service = TaxationService()
+tax_file_save = TaxFileSave()
+save_tax_info = SaveTaxInfo()
 
 
 @router.post("/insert_company", response_model=dict)
@@ -232,3 +235,46 @@ async def chat_with_bot(
         return {"message": chatbot_response}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"세무 챗봇과의 대화 중 오류 발생 : {str(e)}")
+    
+
+## 세무 파일 저장
+@router.post("/taxation/saveFiles")
+async def save_taxation_files(
+    taxation_files: List[UploadFile] = File(...),
+):
+    """
+    세무 관련 파일 저장
+    """
+    try:
+        # 파일을 메모리에서 읽어오기
+        taxation_files_data = []
+        taxation_filenames = []
+        for file in taxation_files :
+            file_data = await file.read()
+            taxation_files_data.append(file_data)
+            taxation_filenames.append(file.filename)
+
+        # 데이터를 저장하는 서비스 호출
+        await tax_file_save.save_Tax_Files(
+            taxation_files=taxation_files_data,
+            taxation_filename=taxation_filenames
+        )
+
+        return {"message" : "세액 관련 파일이 성공적으로 저장되었습니다."}
+    
+    except Exception as e :
+        raise HTTPException(status_code=500, detail=f"세액 관련 파일 저장 처리 중 오류 발생 : {str(e)}")
+
+
+## 세무 관련 정보 저장
+@router.post("/taxation/saveTaxationInfo")
+async def save_taxation_info(
+    category: str = Body(..., embed=True)
+):
+    """
+    세무 관련 정보를 카테고리별 저장
+    """
+    try:
+        save_tax_info.save_tax_info(category)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"세액 관련 정보 저장 처리 중 오류 발생 : {str(e)}")
