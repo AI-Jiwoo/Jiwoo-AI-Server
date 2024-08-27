@@ -37,3 +37,12 @@ cachetools
 pre-commit
 black
 isort
+
+# url 검색용
+bs4
+
+# File 처리용
+python-multipart
+openpyxl
+
+pdfplumber

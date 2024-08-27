@@ -3,18 +3,26 @@ import logging
 from typing import List
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Body
 from pydantic import BaseModel
 
 from services.chatbot import Chatbot
-from services.models import ChatInput, ChatResponse, CompanyInfo, CompanyInput, CompanySearchResult, SupportProgramInfoSearchRequest, WebSearchResult
+from services.taxationChatBot import TaxationChatbot
+from services.models import ChatInput, ChatResponse, CompanyInfo, CompanyInput, CompanySearchResult, SupportProgramInfoSearchRequest, WebSearchResult, TaxationBase
 from utils.database import get_collection
 from utils.embedding_utils import get_company_embedding, get_support_program_embedding
+from utils.taxation import TaxationService
+from utils.fileSave import TaxFileSave
+from utils.save_tax_info import SaveTaxInfo
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 chatbot = Chatbot()
+taxationChatbot = TaxationChatbot()
+taxation_service = TaxationService()
+tax_file_save = TaxFileSave()
+save_tax_info = SaveTaxInfo()
 
 
 @router.post("/insert_company", response_model=dict)
@@ -165,3 +173,106 @@ async def business_viability_assessment_search(input: SupportProgramInfoSearchRe
     except Exception as e:
         logger.error(f"사업 가능성 검색 중 오류 발생: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+## 세무 
+@router.post("/taxation", response_model=dict)
+async def save_taxation(
+    transaction_files: List[UploadFile] = File(...),
+    income_tax_proof_file: UploadFile = File(...),
+    answers: List[str] = Form(...),
+    businessId: int = Form(...),
+    businessContent: str = Form(...),
+    businessType: str = Form(...)
+):
+    """
+        사용자가 업로드한 파일과 텍스트 데이터를 처리하고 저장하는 엔드포인트
+    """
+    try: 
+         # 파일을 메모리에서 읽어오기
+        transaction_files_data = []
+        for file in transaction_files:
+            file_data = await file.read()
+            transaction_files_data.append(file_data)
+
+        income_tax_proof_file_data = await income_tax_proof_file.read()
+
+        # 데이터를 저장하는 서비스 호출
+        await taxation_service.store_taxation(
+            transaction_files=transaction_files_data,
+            transaction_filenames =[file.filename for file in transaction_files],
+            income_tax_proof_file=income_tax_proof_file_data,
+            income_tax_proof_filename=income_tax_proof_file.filename,
+            answers=answers,
+            business_id=businessId,
+            business_content=businessContent,
+            business_type=businessType
+        )
+
+        return {"message": "데이터가 성공적으로 저장되었습니다."}
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"세금 관련 데이터 처리 중 오류 발생 : {str(e)}")
+
+## 세무
+@router.post("/taxation/chat", response_model=dict)
+async def chat_with_bot(
+    businessId: int = Form(...),
+    user_input: str = Form(...)
+):
+    
+    """
+    저장된 데이터를 기반으로 세무 챗봇과 대화하는 엔드포인트
+    """
+    try:
+        chatbot_response = await taxationChatbot.get_response(
+            business_id=businessId,
+            user_input=user_input
+        )
+
+        return {"message": chatbot_response}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"세무 챗봇과의 대화 중 오류 발생 : {str(e)}")
+    
+
+## 세무 파일 저장
+@router.post("/taxation/saveFiles")
+async def save_taxation_files(
+    taxation_files: List[UploadFile] = File(...),
+):
+    """
+    세무 관련 파일 저장
+    """
+    try:
+        # 파일을 메모리에서 읽어오기
+        taxation_files_data = []
+        taxation_filenames = []
+        for file in taxation_files :
+            file_data = await file.read()
+            taxation_files_data.append(file_data)
+            taxation_filenames.append(file.filename)
+
+        # 데이터를 저장하는 서비스 호출
+        await tax_file_save.save_Tax_Files(
+            taxation_files=taxation_files_data,
+            taxation_filename=taxation_filenames
+        )
+
+        return {"message" : "세액 관련 파일이 성공적으로 저장되었습니다."}
+    
+    except Exception as e :
+        raise HTTPException(status_code=500, detail=f"세액 관련 파일 저장 처리 중 오류 발생 : {str(e)}")
+
+
+## 세무 관련 정보 저장
+@router.post("/taxation/saveTaxationInfo")
+async def save_taxation_info(
+    category: str = Body(..., embed=True)
+):
+    """
+    세무 관련 정보를 카테고리별 저장
+    """
+    try:
+        save_tax_info.save_tax_info(category)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"세액 관련 정보 저장 처리 중 오류 발생 : {str(e)}")

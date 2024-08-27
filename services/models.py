@@ -74,3 +74,11 @@ class SupportProgramInfoSearchRequest(BaseModel):
     query: SupportProgramInfo
     threshold: float = Field(0.7, description="유사도 임계값")
     k: int = Field(5, description="반환할 결과의 수")
+
+
+class TaxationBase(BaseModel):
+    """사용자의 사업 관련 정보를 나타내는 모델"""
+    answers : List[str] = Field(..., description="사용자 답변 리스트")
+    businessId: int = Field(..., description="사업 번호")
+    businessContent: str = Field(..., description="사업 내용")
+    businessType : str = Field(..., description="사업자 유형")

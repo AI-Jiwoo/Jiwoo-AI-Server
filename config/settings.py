@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     MILVUS_HOST: str = Field(default="localhost", env="MILVUS_HOST")
     MILVUS_PORT: str = Field(default="19530", env="MILVUS_PORT")
     COLLECTION_NAME: str = "business_info"
+    COLLECTION_NAME2: str = "taxation_info"
 
     # 임베딩 모델 설정
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-base"
