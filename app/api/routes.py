@@ -11,7 +11,6 @@ from services.taxationChatBot import TaxationChatbot
 from services.models import ChatInput, ChatResponse, CompanyInfo, CompanyInput, CompanySearchResult, SupportProgramInfoSearchRequest, WebSearchResult, TaxationBase
 from utils.database import get_collection
 from utils.embedding_utils import get_company_embedding, get_support_program_embedding
-from utils.vector_store import VectorStore
 from utils.taxation import TaxationService
 from utils.fileSave import TaxFileSave
 from utils.save_tax_info import SaveTaxInfo
@@ -21,7 +20,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 chatbot = Chatbot()
 taxationChatbot = TaxationChatbot()
-vector_store = VectorStore()
 taxation_service = TaxationService()
 tax_file_save = TaxFileSave()
 save_tax_info = SaveTaxInfo()

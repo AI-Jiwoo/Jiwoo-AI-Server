@@ -101,22 +101,51 @@ class SaveVATInfo :
         """
         return self.vector_store.search_in_partition(query="", partition_name="VATInfo", k=1000)
 
-    def are_all_data_equal(self, new_data, existing_data):
+    def are_records_equal(self, existing_record, new_record):
+        """
+        기존 레코드와 새 레코드를 비교하여 동일한지 확인합니다.
+        동일하면 True, 그렇지 않으면 False를 반환합니다.
+        """
+        # 기존 레코드의 content는 JSON 문자열로 저장되어 있으므로, 이를 파싱하여 비교합니다.
+        existing_data = json.loads(existing_record['content'])
+
+        # 새 레코드도 동일한 구조로 변환합니다.
+        new_data = {
+            "사업자 유형": new_record["tax_type"],
+            "시기": new_record["period"],
+            "기준 날짜": new_record["date"],
+            "업종": new_record["category"],
+            "부가가치율": new_record["tax_rate"],
+            "부가가치세 세율": new_record["tax_rate"],
+            "세율": new_record["tax_rate"]
+        }
+
+        # 모든 필드를 비교합니다.
+        return (
+            existing_data["사업자 유형"] == new_data["사업자 유형"] and
+            existing_data["시기"] == new_data["시기"] and
+            existing_data["기준 날짜"] == new_data["기준 날짜"] and
+            existing_data["업종"] == new_data["업종"] and
+            existing_data["부가가치율"] == new_data["부가가치율"] and
+            existing_data["부가가치세 세율"] == new_data["부가가치세 세율"] and
+            existing_data["세율"] == new_data["세율"]
+        )
+
+    def are_all_data_equal(self, new_data_list, existing_data_list):
         """
         새로 크롤링된 전체 데이터와 기존 전체 데이터를 비교하여 동일한지 확인.
         데이터가 동일하면 True, 그렇지 않으면 False를 반환
         """
-        if len(new_data) != len(existing_data):
+        if len(new_data_list) != len(existing_data_list):
             return False
         
-        for new_record, existing_record in zip(new_data, existing_data):
-            if not (
-                new_record["tax_type"] == existing_record["tax_type"] and
-                new_record["period"] == existing_record["period"] and
-                new_record["date"] == existing_record["date"] and
-                new_record["category"] == existing_record["category"] and
-                new_record["tax_rate"] == existing_record["tax_rate"]
-            ):
+         # 기존 데이터와 새 데이터를 정렬한 후 비교 (정렬 기준을 원하는 필드로 설정 가능)
+        sorted_new_data_list = sorted(new_data_list, key=lambda x: (x['tax_type'], x['period'], x['date'], x['category']))
+        sorted_existing_data_list = sorted(existing_data_list, key=lambda x: (json.loads(x['content'])['사업자 유형'], json.loads(x['content'])['시기'], json.loads(x['content'])['기준 날짜'], json.loads(x['content'])['업종']))
+
+        
+        for new_record, existing_record in zip(sorted_new_data_list, sorted_existing_data_list):
+            if not self.are_records_equal(existing_record, new_record):
                 return False
         
         return True

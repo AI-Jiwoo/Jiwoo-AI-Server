@@ -138,7 +138,7 @@ def get_data_from_partition(collection_name: str, partition_name: str, limit: in
         {
             # "id": result["id"],
             "partition": partition_name,
-            "content": result["content"][:30] + "..." if len(result["content"]) > 30 else result["content"],
+            "content": result["content"][:300] + "..." if len(result["content"]) > 300 else result["content"],
             # "embedding": result["embedding"][:10] + "..." if len(result["embedding"]) > 10 else result["embedding"]
         }
         for result in results
@@ -175,7 +175,7 @@ connect_to_milvus()
 # 한 컬렉션의 전체 데이터 조회
 # get_sample_data(settings.COLLECTION_NAME2, limit=5)
 # 한 파티션의 데이터 조회
-get_data_from_partition(settings.COLLECTION_NAME2, "IncomeRates", 50 )
+# get_data_from_partition(settings.COLLECTION_NAME2, "TaxMethod", 50 )
 
 # 모든 컬렉션 삭제
 # drop_all_collection()
@@ -184,6 +184,6 @@ get_data_from_partition(settings.COLLECTION_NAME2, "IncomeRates", 50 )
 # 한 컬렉션의 모든 인덱스 삭제
 # drop_collection_indexes(settings.COLLECTION_NAME2)
 # 한 파티션의 모든 데이터 삭제
-# drop_partition_indexes(settings.COLLECTION_NAME2, "IncomeRates")
+drop_partition_indexes(settings.COLLECTION_NAME2, "TaxMethod")
 # vectorDB unload
 # unload_collection(settings.COLLECTION_NAME2)

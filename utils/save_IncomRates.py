@@ -108,21 +108,40 @@ class SaveIncomeRate :
 
         return self.vector_store.search_in_partition(query="", partition_name="IncomeRates", k=1000)
 
-    def are_all_data_equal(self, new_data, existing_data):
+    def are_records_equal(self, existing_record, new_record):
+        """
+        기존 레코드와 새 레코드를 비교하여 동일한지 확인합니다.
+        동일하면 True, 그렇지 않으면 False를 반환합니다.
+        """
+        # 기존 레코드의 content는 JSON 문자열로 저장되어 있으므로, 이를 파싱하여 비교합니다.
+        existing_data = json.loads(existing_record['content'])
+
+        # 새 레코드도 동일한 구조로 변환합니다.
+        new_data = {
+            "연도": new_record["year"],
+            "과세표준": new_record["income_range"],
+            "세율": new_record["tax_rate"],
+            "누진공세": new_record["deduction"]
+        }
+
+        # 모든 필드를 비교합니다.
+        return (
+            existing_data["연도"] == new_data["연도"] and
+            existing_data["과세표준"] == new_data["과세표준"] and
+            existing_data["세율"] == new_data["세율"] and
+            existing_data["누진공세"] == new_data["누진공세"]
+        )
+
+    def are_all_data_equal(self, new_data_list, existing_data_list):
         """
         새로 크롤링된 전체 데이터와 기존 전체 데이터를 비교하여 동일한지 확인.
         데이터가 동일하면 True, 그렇지 않으면 False를 반환.
         """
-        if len(new_data) != len(existing_data):
+        if len(new_data_list) != len(existing_data_list):
             return False
 
-        for new_record, existing_record in zip(new_data, existing_data):
-            if not (
-                new_record["income_range"] == existing_record["income_range"] and
-                new_record["tax_rate"] == existing_record["tax_rate"] and
-                new_record["deduction"] == existing_record["deduction"] and
-                new_record["year"] == existing_record["year"]
-            ):
+        for new_record, existing_record in zip(new_data_list, existing_data_list):
+            if not self.are_records_equal(existing_record, new_record):
                 return False
 
         return True
