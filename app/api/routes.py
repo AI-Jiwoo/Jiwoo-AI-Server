@@ -274,5 +274,6 @@ async def save_taxation_info(
     """
     try:
         save_tax_info.save_tax_info(category)
+        return {"message" : f"{category} 이/가 성공적으로 저장되었습니다."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"세액 관련 정보 저장 처리 중 오류 발생 : {str(e)}")
